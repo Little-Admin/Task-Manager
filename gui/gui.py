@@ -1,14 +1,17 @@
+from kivy.uix.accordion import NumericProperty
 from kivy.app import App
+from kivy.properties import StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.recycleview import RecycleView
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.lang import Builder
 from kivy.graphics import Color, Rectangle
 
-
+Builder.load_file('kv.kv')
 
 class ColoredBox(GridLayout):
     def __init__(self, bg_color=(1,1,1,1), **kwargs):
@@ -24,6 +27,22 @@ class ColoredBox(GridLayout):
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
 
+class Task_listView(RecycleView):
+    def __init__(self, data=None, **kwargs):    
+        super().__init__(**kwargs)
+        if data:
+            self.data = [{"text": val} for val in data]
+
+    def refresh_data_index(self):
+        'Updates data Index when a element is deleted'
+        
+        for i, task in enumerate(self.data):
+            task['index'] = i
+
+class TaskCell(BoxLayout):
+    text = StringProperty("")
+    index = NumericProperty(0)
+
 # --- MainApp ---
 
 class TaskManagerApp(App):
@@ -38,6 +57,8 @@ class TaskManagerApp(App):
                 ButtonBox
                     add_taskButton
         """
+        self.task_index = 0
+
         root = BoxLayout(orientation="vertical")
         self.tab_bar = BoxLayout(size_hint_y=None, height=40)
         self.MainBox = GridLayout(cols=1)
@@ -105,7 +126,27 @@ class TaskManagerApp(App):
 
     def create_task(self):
         screen = self.manager.get_screen(self.manager.current)
-        screen.add_widget(Label(text='hello', color='black'))
+
+        # If pages EMPTY
+        none_Label = screen.children[0]
+        screen.remove_widget(none_Label)
+
+        task_list = Task_listView()
+        task_list.data = [
+        {"text": "Lavar platos", "index":0},
+        {"text": "Comprar comida", "index":1},
+        {"text": "Desahogarme", "index":2},
+        {"text": "Reflexionar", "index":3},
+        ]
+
+        screen.add_widget(task_list)
+
+    def delete_task(self, index):
+        screen = self.manager.get_screen(self.manager.current)
+        task_list = screen.children[0] # Get task_list obj
+
+        print(task_list.data.pop(index))
+        task_list.refresh_data_index()
 
     def change_tab(self, name):
         self.manager.current = name
@@ -123,7 +164,6 @@ class TaskManagerApp(App):
         self.tab_names.append(title)
         
         return title
-
 
 # --- Run the App ---
 if __name__ == "__main__":

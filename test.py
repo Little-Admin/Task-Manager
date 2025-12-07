@@ -1,21 +1,18 @@
-tab_names = ['']
+class taksview:
+    def __init__(self):
+        self.data = [
+            {"text":"hola", "index": 0},
+            {"text":"hola 1", "index": 1},
+            {"text":"hola 2", "index": 2}
+        ]
 
-def create_title(title):
-        if title in tab_names:
-            number = 1
-            while True:     # Adds one number per every time is title used in self.tab_names
-                test_title = title + f'({number})'
-                number += 1
-                if test_title not in tab_names:
-                    title = test_title
-                    break
-        
-        tab_names.append(title)
+    def del_row(self, index):
+        self.data.pop(index)
 
-        return title
+    def update_index(self):
+        for i, val in enumerate(self.data):
+            print(val, i)
 
-name1 = create_title('New Tab')
-name2 = create_title('New Tab')
-name3 = create_title('New Tab')
-
-print(name1, name2, name3)
+a = taksview()
+a.del_row(1)
+a.update_index()
