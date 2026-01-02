@@ -1,15 +1,20 @@
+from kivy.uix.accordion import BooleanProperty
 from kivy.uix.accordion import NumericProperty
 from kivy.app import App
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.recycleview import RecycleView
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivy.uix.textinput import TextInput
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.lang import Builder
 from kivy.graphics import Color, Rectangle
+from kivy.clock import Clock
+
 
 Builder.load_file('Gui/kv.kv')
 
@@ -39,10 +44,33 @@ class Task_listView(RecycleView):
         for i, task in enumerate(self.data):
             task['index'] = i
 
-class TaskCell(BoxLayout):
+class TaskCell(RecycleDataViewBehavior, BoxLayout):
     text = StringProperty("")
     index = NumericProperty(0)
+    editing = BooleanProperty(False)
 
+    def refresh_view_attrs(self, rv, index, data):
+        self.index = index
+        return super().refresh_view_attrs(rv, index, data)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            if touch.is_double_tap:
+                self.editing = True
+                Clock.schedule_once(self.focus_input, 0)
+                return True
+        return super().on_touch_down(touch)
+
+    def focus_input(self, dt):
+        for child in self.children:
+            if isinstance(child, TextInput):
+                child.focus = True
+                child.select_all()
+
+    def save_text(self, new_text):
+        self.text = new_text
+        self.editing = False
+        self.parent.parent.data[self.index]["text"] = new_text
 # --- MainApp ---
 
 class TaskManagerApp(App):
@@ -110,9 +138,11 @@ class TaskManagerApp(App):
         return root
     
     def create_tab(self, title):
+        "Set NewTab name = title, Creates Screen and adds tab to bar"
+
         new_title = self.create_title(title)
 
-        # Create screen
+        # Create screen with "Empty" massage
         screen = Screen(name=new_title)
         screen.add_widget(Label(text='Empty', color='black'))
         self.manager.add_widget(screen)
@@ -129,19 +159,17 @@ class TaskManagerApp(App):
 
     def create_task(self, task, pageName):
         screen = self.manager.get_screen(pageName)
-        print('chiledrennnnnnnnnnnnn', screen.children)
 
-        if type(screen.children[0]) == type(Task_listView()):
+        if type(screen.children[0]) == type(Task_listView()):   # If there is Task_listView in page
             task_list = screen.children[0]    # Get Task_listView OBJ
         else: # If screen has label
-            screen.remove_widget(screen.children[0])
+            screen.remove_widget(screen.children[0])    # If there is not Task_listView in page
             task_list = Task_listView()     # Create OBJ
             screen.add_widget(task_list)
 
         task_list.data.append({'text' : task})
         
     def delete_task(self, index):
-        print('aaaaaa')
         screen = self.manager.get_screen(self.manager.current)
         task_list = screen.children[0] # Get task_list obj
 
@@ -167,6 +195,7 @@ class TaskManagerApp(App):
         return title
     
     def Build_tasks(self):
+        "Reads Task From Json File and create structure in App"
         # Create tabs
         tabs = self.tasks[1:]
         for tab in tabs:
