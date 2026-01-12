@@ -6,5 +6,5 @@ import offline_mode
 
 # Run App
 if __name__ == '__main__':
-    tasks = offline_mode.json_OBJ.sort_jsonData()
-    TaskManagerApp(tasks).run()
+    task_OBJ = offline_mode.json_OBJ
+    TaskManagerApp(task_OBJ).run()

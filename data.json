@@ -1,20 +1,11 @@
 {
     "name": "UserName",
-    "tasks": [
-        {
-            "PageName": "Casa",
-            "PageTasks": [
-                "lavar loza",
-                "barrer la casa",
-                "Preparar la comida",
-                "Hacer la cama"
-            ]
-        },
-        {
-            "PageName": "Trabajo",
-            "PageTasks": [
-                "Crear Base de Datos",
-                "Depurar Codigo"
-            ]}
-    ]
+    "tasks": {
+        "New Tab": [
+            "lavar loza",
+            "barrer la casa",
+            "Preparar la comida",
+            "Hacer la cama"
+        ]
+    }
 }

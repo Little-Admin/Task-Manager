@@ -1,3 +1,4 @@
+from kivy.uix.filechooser import FileChooser
 from kivy.uix.accordion import BooleanProperty
 from kivy.uix.accordion import NumericProperty
 from kivy.app import App
@@ -14,6 +15,7 @@ from kivy.uix.label import Label
 from kivy.lang import Builder
 from kivy.graphics import Color, Rectangle
 from kivy.clock import Clock
+from kivy.uix.popup import Popup
 
 
 Builder.load_file('Gui/kv.kv')
@@ -71,13 +73,57 @@ class TaskCell(RecycleDataViewBehavior, BoxLayout):
         self.text = new_text
         self.editing = False
         self.parent.parent.data[self.index]["text"] = new_text
+
+class TaskPopup(Popup):
+    def __init__(self, title, on_submit, **kwargs):
+        super().__init__(**kwargs)
+
+        self.title = title
+        self.size_hint = (None, None)
+        self.size = (300, 140)
+        self.background = ""
+        self.background_color = (0.1, 0.1, 0.1, 1)
+
+        self.on_submit = on_submit
+
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        with layout.canvas.before:
+            Color(0.15, 0.15, 0.15, 1)
+            self.rect = Rectangle(size=layout.size, pos=layout.pos)
+
+        layout.bind(
+            size=lambda i, v: setattr(self.rect, 'size', v),
+            pos=lambda i, v: setattr(self.rect, 'pos', v)
+        )
+
+        self.input = TextInput(
+            hint_text="Write Your Task",
+            multiline=False,
+            background_color=(0.2, 0.2, 0.2, 1),
+            foreground_color=(1, 1, 1, 1),
+            hint_text_color=(0.7, 0.7, 0.7, 1),
+            cursor_color=(1, 1, 1, 1)
+        )
+        self.input.bind(on_text_validate=self.submit_task)
+
+        layout.add_widget(self.input)
+
+        self.content = layout
+
+    def submit_task(self, instance):
+        task = self.input.text.strip()
+        if task:
+            self.on_submit(task)
+        self.dismiss()
+    
 # --- MainApp ---
 
 class TaskManagerApp(App):
-    def __init__(self, tasks:dict, **kwargs):
+    def __init__(self, task_OBJ, **kwargs):
         super().__init__(**kwargs)
         self.tab_names = []  # Stores the names of all existing tabs
-        self.tasks = tasks
+        self.tasks = task_OBJ
 
     def build(self):
         """
@@ -104,7 +150,7 @@ class TaskManagerApp(App):
         self.Build_tasks()
 
         self.add_tabButton = Button(text="+", size_hint_x=None, width=120)
-        self.add_tabButton.bind(on_press = lambda x: self.create_tab("New Tab"))
+        self.add_tabButton.bind(on_press = lambda x: self.open_popup('CREATE_TAB'))
         self.tab_bar.add_widget(self.add_tabButton)
 
         self.add_taskButton = Button(text='Add Task',
@@ -112,7 +158,7 @@ class TaskManagerApp(App):
                                     size_hint=(1, None),
                                     height=50,
                                     )
-        self.add_taskButton.bind(on_release=lambda x: self.create_task('hola', self.manager.current))
+        self.add_taskButton.bind(on_release=lambda x: self.open_popup('CREATE_TASK'))
 
         self.ButtonBox.add_widget(GridLayout())
         #Center Button
@@ -137,7 +183,18 @@ class TaskManagerApp(App):
 
         return root
     
-    def create_tab(self, title):
+    def open_popup(self, mode):
+        "mode = 'CREATE_TAB', 'CREATE_TASK"
+
+        match mode:
+            case 'CREATE_TAB':
+                popup = TaskPopup(title='New Tab', on_submit=self.create_tab)
+                popup.open()
+            case 'CREATE_TASK':
+                popup = TaskPopup(title='New Task', on_submit=self.create_task)
+                popup.open()
+    
+    def create_tab(self, title, save = True):
         "Set NewTab name = title, Creates Screen and adds tab to bar"
 
         new_title = self.create_title(title)
@@ -154,10 +211,17 @@ class TaskManagerApp(App):
         # Insert before "+" button
         self.tab_bar.add_widget(btn, index=len(self.tab_bar.children))
 
+        # Save Changes on JSON File
+        if save == True:
+            self.tasks.create_page(new_title)
+            self.tasks.write()
+
         # Immediately show the new tab
         self.manager.current = new_title
 
-    def create_task(self, task, pageName):
+    def create_task(self, task, pageName=None, save=True):
+        if not pageName:
+            pageName = self.manager.current
         screen = self.manager.get_screen(pageName)
 
         if type(screen.children[0]) == type(Task_listView()):   # If there is Task_listView in page
@@ -168,14 +232,25 @@ class TaskManagerApp(App):
             screen.add_widget(task_list)
 
         task_list.data.append({'text' : task})
+
+        # Save Changes on JSON File
+        if save == True:
+            self.tasks.create_task(pageName, task)
+            self.tasks.write()
         
     def delete_task(self, index):
-        screen = self.manager.get_screen(self.manager.current)
+        pageName = self.manager.current
+
+        screen = self.manager.get_screen(pageName)
         task_list = screen.children[0] # Get task_list obj
 
-        task_list.data.pop(index)
+        deleted_task = task_list.data.pop(index)['text']
 
         task_list.refresh_data_index()
+
+        # Save Changes on JSON File
+        self.tasks.delete_task(pageName, deleted_task)
+        self.tasks.write()
 
     def change_tab(self, name):
         self.manager.current = name
@@ -197,10 +272,12 @@ class TaskManagerApp(App):
     def Build_tasks(self):
         "Reads Task From Json File and create structure in App"
         # Create tabs
-        tabs = self.tasks[1:]
+        tabs = self.tasks.sort_jsonData()[1:]
+        print(tabs)
         for tab in tabs:
-            self.create_tab(tab['PageName'])
+            PageName = list(tab.keys())[0]
+            self.create_tab(PageName, save=False)
             # Create List View
 
-            for task in tab['PageTasks']:
-                self.create_task(task, tab['PageName'])
+            for task in tab[PageName]:
+                self.create_task(task, PageName, save=False)
